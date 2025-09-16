@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from django.db import transaction
 
 from apps.store.models import (CartModel, CategoryModel, ProductModel, CartItemModel,
                                OrderItemModel, OrderModel)
@@ -89,10 +88,10 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'total', 'status', 'created_at', 'updated_at', 'items')
         read_only_fields = ('total', 'status', 'created_at', 'updated_at', 'items', 'user')
 
+
 class CreateOrderSerializer(serializers.ModelSerializer):
     def validate(self, data):
         return data
 
     def create(self, validated_data):
         raise NotImplementedError('Use view to create order in a transaction')
-
