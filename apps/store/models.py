@@ -77,5 +77,5 @@ class OrderItemModel(models.Model):
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=12, decimal_places=2)
 
-    def  subtotal(self):
+    def subtotal(self):
         return self.price * self.quantity
