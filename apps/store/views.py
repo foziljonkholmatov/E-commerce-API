@@ -1,7 +1,6 @@
 from decimal import Decimal
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.template.context_processors import request
 from rest_framework import generics, viewsets, mixins
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import action
@@ -47,46 +46,60 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'created_at']
 
-class CartViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):
+class CartViewSet(viewsets.GenericViewSet):
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
         cart, _ = CartModel.objects.get_or_create(user=self.request.user)
         return cart
-    @action(detail=False, method=['POST'])
-    def add_item(self):
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
         cart = self.get_object()
-        serializer = CartItemSerializer
+        return Response(CartSerializer(cart, context={'request': request}).data)
+
+    @action(detail=False, methods=['post'])
+    def add_item(self, request):
+        cart = self.get_object()
+        serializer = CartItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
         prod = serializer.validated_data['product']
         qty = serializer.validated_data['quantity']
+
         if qty < 1:
-            return Response({'Detail': 'quantity must be >=1'}, status=400)
+            return Response({'detail': 'Quantity must be >=1'}, status=400)
         if prod.quantity < qty:
             return Response({'detail': 'Not enough stock'}, status=400)
-        item, created = CartItemModel.objects.get_or_create(cart=cart, product=prod, defaults={'quantity': qty})
+
+        item, created = CartItemModel.objects.get_or_create(
+            cart=cart, product=prod, defaults={'quantity': qty}
+        )
         if not created:
             new_qty = item.quantity + qty
             if prod.quantity < new_qty:
                 return Response({'detail': 'Not enough stock for total quantity'}, status=400)
             item.quantity = new_qty
             item.save()
+
         return Response(CartSerializer(cart, context={'request': request}).data, status=201)
 
     @action(detail=True, methods=['patch'], url_path='items/(?P<item_id>[^/.]+)')
     def update_item(self, request, item_id=None):
         cart = self.get_object()
         item = get_object_or_404(CartItemModel, pk=item_id, cart=cart)
+
         qty = int(request.data.get('quantity', item.quantity))
         if qty < 1:
             item.delete()
             return Response({'detail': 'Item removed'}, status=204)
         if item.product.quantity < qty:
             return Response({'detail': 'Not enough stock'}, status=400)
+
         item.quantity = qty
         item.save()
-        return Response(CartSerializer(cart).data)
+        return Response(CartSerializer(cart, context={'request': request}).data)
 
     @action(detail=True, methods=['delete'], url_path='items/(?P<item_id>[^/.]+)')
     def delete_item(self, request, item_id=None):
@@ -94,6 +107,7 @@ class CartViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):
         item = get_object_or_404(CartItemModel, pk=item_id, cart=cart)
         item.delete()
         return Response(status=204)
+
 
 
 class OrderViewSet(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin):
