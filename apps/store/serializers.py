@@ -62,7 +62,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(read_only=True, many=True)
-    total = serializers.SerializerMethodField
+    total = serializers.SerializerMethodField()
 
     class Meta:
         model = CartModel
